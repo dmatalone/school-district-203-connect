@@ -3,104 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ConnectCast Receiver</title>
+<title>District 203 Computer Screen Share</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-  :root{--bg:#050914;--panel:#11182a;--text:#f6f8ff;--muted:#95a1bd;--accent:#6ea8fe;--good:#49d17d}
-  *{box-sizing:border-box} html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#050914;color:var(--text)}
-  body{overflow:hidden}
-  #stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at center,#111a32,#050914 70%)}
-  #welcome{text-align:center;padding:30px}.brand{font-size:42px;font-weight:900;letter-spacing:-2px}.brand span{color:var(--accent)}
-  .codeLabel{margin-top:32px;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:2px}.code{font-size:72px;font-weight:900;letter-spacing:12px;margin:5px 0 10px}.status{color:var(--muted)}
-  .connected{color:var(--good);font-weight:800}
-  #content{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:50px;text-align:center}
-  #contentText{font-size:clamp(34px,6vw,86px);font-weight:850;line-height:1.08;max-width:1200px;white-space:pre-wrap;word-break:break-word}
-  #iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:white;display:none}
-  #image{max-width:100%;max-height:100%;object-fit:contain;display:none}
-  .topbar{position:absolute;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center;z-index:20;pointer-events:none}
-  .pill{background:rgba(12,18,33,.78);border:1px solid rgba(255,255,255,.08);padding:10px 14px;border-radius:999px;font-size:13px;color:#c9d1e5;backdrop-filter:blur(10px)}
-  button{pointer-events:auto;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;background:white;color:#111}
+:root{--bg:#07110d;--card:#173529;--text:#f7fbf9;--muted:#a9beb4;--accent:#55c99d;--accent2:#2d9e78;--good:#43d17c;--bad:#ff7d7d}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(circle at top,#18392d,#07110d 65%);color:var(--text)}body{padding:24px}.wrap{max-width:820px;margin:auto}.brand{font-size:38px;font-weight:900;letter-spacing:-1.5px}.brand span{color:var(--accent)}.sub{color:var(--muted);margin:5px 0 22px}.card{background:rgba(23,53,41,.96);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:22px;margin-bottom:16px}.codeLabel{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}.code{font-size:68px;font-weight:900;letter-spacing:10px;margin:4px 0 12px;word-break:break-all}.status{padding:12px 14px;border-radius:13px;background:#0b1712;color:var(--muted);margin-top:12px}.ok{color:var(--good)}.bad{color:var(--bad)}button{border:0;border-radius:14px;padding:14px 18px;font-size:16px;font-weight:850;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--accent2),var(--accent));margin-right:10px;margin-top:10px}button.secondary{background:#29483d}.tiny{font-size:13px;color:var(--muted);line-height:1.5;margin-top:10px}video{width:100%;max-height:420px;background:#000;border-radius:16px;margin-top:14px;display:none}.row{display:flex;flex-wrap:wrap;gap:8px}@media(max-width:600px){.brand{font-size:31px}.code{font-size:48px;letter-spacing:7px}}
 </style>
 </head>
 <body>
-<div id="stage">
-  <div id="welcome">
-    <div class="brand">Connect<span>Cast</span></div>
-    <div class="codeLabel">Connection code</div>
+<div class="wrap">
+  <div class="brand">School District <span>203</span></div>
+  <div class="sub">Windows Computer Screen Share</div>
+
+  <div class="card">
+    <div class="codeLabel">Phone pairing code</div>
     <div id="code" class="code">------</div>
-    <div id="status" class="status">Starting receiver…</div>
+    <div class="row">
+      <button id="startBtn" onclick="startShare()">Start Screen Share</button>
+      <button class="secondary" onclick="stopShare()">Stop Sharing</button>
+    </div>
+    <div id="status" class="status">Starting connection…</div>
+    <div class="tiny">When Windows asks what to share, choose <strong>Entire Screen</strong> if you want your phone to keep showing everything as you open different apps and windows.</div>
+    <video id="preview" autoplay muted playsinline></video>
   </div>
-  <div id="content"><div id="contentText"></div><img id="image" alt=""></div>
-  <iframe id="iframe" allow="autoplay; fullscreen"></iframe>
-</div>
-<div class="topbar">
-  <div class="pill">Receiver • <span id="miniCode">------</span></div>
-  <button onclick="showHome()">Show Code</button>
 </div>
 <script>
-const code = String(Math.floor(100000 + Math.random()*900000));
-document.getElementById('code').textContent = code;
-document.getElementById('miniCode').textContent = code;
+const code=String(Math.floor(100000+Math.random()*900000));
+const codeEl=document.getElementById('code');
+const statusEl=document.getElementById('status');
+const preview=document.getElementById('preview');
+codeEl.textContent=code;
+let screenStream=null;
+let activeConn=null;
+let activeCall=null;
+let pendingViewerId=null;
+const peer=new Peer('district203-screen-'+code);
 
-const peer = new Peer('connectcast-' + code);
-let activeConn = null;
-
-peer.on('open', () => {
-  document.getElementById('status').textContent = 'Ready — enter this code on your phone';
-});
-peer.on('connection', conn => {
-  if (activeConn) { try { activeConn.close(); } catch(e){} }
-  activeConn = conn;
-  conn.on('open', () => {
-    document.getElementById('status').innerHTML = '<span class="connected">● Phone connected</span>';
-  });
-  conn.on('data', data => handleData(data));
-  conn.on('close', () => {
-    document.getElementById('status').textContent = 'Phone disconnected — waiting…';
-  });
-});
-peer.on('error', err => {
-  document.getElementById('status').textContent = 'Connection error: ' + err.type;
-});
-
-function resetViews(){
-  document.getElementById('welcome').style.display='none';
-  document.getElementById('content').style.display='none';
-  document.getElementById('iframe').style.display='none';
-  document.getElementById('image').style.display='none';
+function setStatus(msg,type=''){
+  statusEl.textContent=msg;
+  statusEl.className='status'+(type?' '+type:'');
 }
-function showHome(){
-  resetViews();
-  document.getElementById('welcome').style.display='block';
+
+peer.on('open',()=>setStatus('Ready. Click Start Screen Share, then enter this code on your phone.'));
+peer.on('error',err=>setStatus('Connection error: '+err.type,'bad'));
+peer.on('connection',conn=>{
+  if(activeConn){try{activeConn.close()}catch(e){}}
+  activeConn=conn;
+  conn.on('open',()=>setStatus('Phone connected. Waiting for screen share…','ok'));
+  conn.on('data',data=>{
+    if(data&&data.type==='viewer-ready'&&data.viewerId){
+      pendingViewerId=data.viewerId;
+      setStatus('Phone paired. Starting live screen…','ok');
+      startCallIfReady();
+    }
+  });
+  conn.on('close',()=>setStatus('Phone disconnected. You can reconnect with the same code.'));
+});
+
+async function startShare(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+    setStatus('This browser does not support screen sharing. Use current Chrome or Edge on Windows.','bad');
+    return;
+  }
+  try{
+    if(screenStream) stopShare();
+    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:false});
+    preview.srcObject=screenStream;
+    preview.style.display='block';
+    setStatus('Screen selected. Now connect your phone with the code above.','ok');
+    const track=screenStream.getVideoTracks()[0];
+    track.addEventListener('ended',()=>stopShare());
+    startCallIfReady();
+  }catch(err){
+    setStatus('Screen sharing was cancelled or blocked. Click Start Screen Share and try again.','bad');
+  }
 }
-function handleData(data){
-  if(!data || !data.type) return;
-  if(data.type==='text'){
-    resetViews();
-    const box=document.getElementById('content');
-    box.style.display='flex';
-    document.getElementById('contentText').textContent=data.value || '';
-  }
-  if(data.type==='url'){
-    resetViews();
-    const frame=document.getElementById('iframe');
-    frame.src=data.value;
-    frame.style.display='block';
-  }
-  if(data.type==='image'){
-    resetViews();
-    const img=document.getElementById('image');
-    img.src=data.value;
-    document.getElementById('content').style.display='flex';
-    img.style.display='block';
-  }
-  if(data.type==='home') showHome();
-  if(data.type==='blank'){
-    resetViews();
-  }
-  if(data.type==='color'){
-    document.getElementById('stage').style.background=data.value;
-  }
+
+function startCallIfReady(){
+  if(!screenStream||!pendingViewerId)return;
+  if(activeCall){try{activeCall.close()}catch(e){}}
+  activeCall=peer.call(pendingViewerId,screenStream);
+  activeCall.on('close',()=>setStatus('Live screen ended.','bad'));
+  activeCall.on('error',()=>setStatus('Could not send the screen to the phone.','bad'));
+  setStatus('Live screen is being sent to your phone.','ok');
+}
+
+function stopShare(){
+  if(activeCall){try{activeCall.close()}catch(e){} activeCall=null;}
+  if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;}
+  preview.srcObject=null;preview.style.display='none';
+  setStatus('Screen sharing stopped. The pairing code is still active.');
 }
 </script>
 </body>
